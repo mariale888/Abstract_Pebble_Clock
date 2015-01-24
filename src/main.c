@@ -115,7 +115,7 @@ static void update_hour(){
 
    //set hours and min cubes
   int hrTime = 12;
-  int count = 0;
+  int count  = 0;
   int hr = tick_time->tm_hour;
   //converting to 12 hr clock
   if(hr > hrTime )hr -= hrTime; 
@@ -226,9 +226,11 @@ static void cube_apply_accel(Cube *cube, AccelData accel) {
   cube_apply_force(cube, force);
 }
 
-static void cube_update(Cube *cube) {
+static void cube_update(Cube *cube, int index) {
   const GRect frame = hour_frame; // frame of where hr cubes should be!
-  double e = 0.5;
+  
+  //controlling collisions with wall frame wall
+  double e = 0.2;
   if ((cube->rec.origin.x < 0 && cube->vel.x < 0)
     || (cube->rec.origin.x + cube->width > frame.size.w && cube->vel.x > 0)) {
     cube->vel.x = -cube->vel.x * e;
@@ -237,6 +239,34 @@ static void cube_update(Cube *cube) {
     || (cube->rec.origin.y + cube->height > frame.size.h && cube->vel.y > 0)) {
     cube->vel.y = -cube->vel.y * e;
   }
+  
+  e = 0.2;
+  //controlling collisions bw cubes
+  for(int i = index+1; i< NUM_CUBES;i++){
+    Cube *c = &cubes[i];
+    if(c->curHeight == 0) continue;
+    
+    //check if rec intersect
+    bool intersect = true;
+    int x_ = 1;
+    int y_ = 1;
+    if( (c->rec.origin.x + c->width) < cube->rec.origin.x || (cube->rec.origin.x + cube->width) < c->rec.origin.x){
+      intersect = false;
+      x_ = 0;
+    }
+    if( (cube->rec.origin.y + cube->height) < c->rec.origin.y  || (c->rec.origin.y + c->height) < cube->rec.origin.y){
+      intersect = false;
+      y_ = 0;
+    }
+    //if cubes intersect, do something
+    if(intersect){
+      if(x_)
+        cube->vel.x = -cube->vel.x * e;
+      if(y_)
+        cube->vel.y = -cube->vel.y * e;
+    }
+  }
+  
   cube->rec.origin.x += cube->vel.x;
   cube->rec.origin.y += cube->vel.y;
 }
@@ -248,8 +278,9 @@ static void timer_callback(void *data) {
  //sending accelerometer info to all the hr cubes
   for (int i = 0; i < NUM_CUBES; i++) {
     Cube *cube = &cubes[i];
+    if(cube->curHeight < cube->height) continue;
     cube_apply_accel(cube, accel);
-    cube_update(cube);
+    cube_update(cube, i);
   }
 
   //mark layer dirty so it calld calls draw fun. again
