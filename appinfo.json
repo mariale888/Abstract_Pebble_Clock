@@ -1,0 +1,19 @@
+{
+    "appKeys": {},
+    "capabilities": [
+        ""
+    ],
+    "companyName": "mariaalm@cmu.edu",
+    "longName": "Abstract_Clock",
+    "projectType": "native",
+    "resources": {
+        "media": []
+    },
+    "shortName": "Abstract_Clock",
+    "uuid": "518516bc-ba6d-4c0d-941b-4bfdc983a1b0",
+    "versionCode": 1,
+    "versionLabel": "1.0",
+    "watchapp": {
+        "watchface": false
+    }
+}
