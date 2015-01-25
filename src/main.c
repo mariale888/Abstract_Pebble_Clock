@@ -17,7 +17,7 @@
 #define NUM_CUBES 12
 #define MATH_PI 3.141592653589793238462
 #define CUBE_DENSITY 0.25
-#define CUBE_MASS 50
+#define CUBE_MASS 80
 #define ACCEL_RATIO 0.05
 #define ACCEL_STEP_MS 50
   
@@ -56,6 +56,7 @@ static GRect window_frame;
 static GRect hour_frame;
 
 static MyTime myTime;
+static bool done = false;
 
 //function to init all the main cubes
 static void cube_init(Cube *cube, GRect frame, double height) {
@@ -121,17 +122,19 @@ static void update_hour(){
   if(hr > hrTime )hr -= hrTime; 
   myTime.hour = hr;
   
+  //test
+  myTime.hour = 7;
   //reset cubes
   for(int i=0;i< NUM_CUBES;i++){
     cubes[i].curHeight = 0;
   }
-  if(hr == hrTime) {
+  if(myTime.hour == hrTime) {
     for(int i = 0; i < hr; i++) 
       cubes[i].curHeight = cubes[i].height;
     hr = 0;
   }
   
-  for(int i = 0; i < hr; i++){
+  for(int i = 0; i < myTime.hour; i++){
     int ran = rand()%hrTime;
     count = 0;
     while(cubes[ran].curHeight > 0 && count < 10){
@@ -172,9 +175,7 @@ static void init_time() {
   /* Intializes random number generator */
   time_t t;
   srand((unsigned) time(&t));
-  //set seconds
- // cube_init(&secondCube, window_frame, 50);
-  
+
   //set hours & minutes
   update_hour();
   update_minutes();
@@ -196,9 +197,8 @@ static void update_time() {
   //checking to update other time handles (hours & minutes)
   int hr = tick_time->tm_hour;
   if(hr > 12)hr -= 12;
- 
-  if(myTime.hour != hr)
-    update_hour();
+  //if(myTime.hour != hr)
+    //update_hour();
   if(myTime.minutes != tick_time->tm_min)
     update_minutes();
 }
@@ -212,8 +212,6 @@ static void tick_handler_sec(struct tm *tick_time, TimeUnits units_changed) {
 //------------
 // Accelerometer / CollisFunctions 
 //------------
-
-
 static void cube_apply_force(Cube *cube, Vec2d force) {
   cube->vel.x += force.x / CUBE_MASS;
   cube->vel.y += force.y / CUBE_MASS;
@@ -228,9 +226,9 @@ static void cube_apply_accel(Cube *cube, AccelData accel) {
 
 static void cube_update(Cube *cube, int index) {
   const GRect frame = hour_frame; // frame of where hr cubes should be!
-  
+
   //controlling collisions with wall frame wall
-  double e = 0.2;
+  double e = 0.1;
   if ((cube->rec.origin.x < 0 && cube->vel.x < 0)
     || (cube->rec.origin.x + cube->width > frame.size.w && cube->vel.x > 0)) {
     cube->vel.x = -cube->vel.x * e;
@@ -239,50 +237,75 @@ static void cube_update(Cube *cube, int index) {
     || (cube->rec.origin.y + cube->height > frame.size.h && cube->vel.y > 0)) {
     cube->vel.y = -cube->vel.y * e;
   }
-  
-  e = 0.2;
-  //controlling collisions bw cubes
-  for(int i = index+1; i< NUM_CUBES;i++){
+  cube->rec.origin.x += cube->vel.x;
+  cube->rec.origin.y += cube->vel.y;
+
+  int threshold = 2;
+  //controlling collisions bw cubes index+1
+  for(int i = index+1; i< NUM_CUBES;i++){   
     Cube *c = &cubes[i];
-    if(c->curHeight == 0) continue;
-    
+    if((c-> curHeight < c->height) || i == index) continue;  
     //check if rec intersect
     bool intersect = true;
-    int x_ = 1;
-    int y_ = 1;
-    if( (c->rec.origin.x + c->width) < cube->rec.origin.x || (cube->rec.origin.x + cube->width) < c->rec.origin.x){
+    if( (c->rec.origin.x + (c->width-threshold)) <= cube->rec.origin.x || (cube->rec.origin.x + (cube->width-threshold)) <= c->rec.origin.x){
       intersect = false;
-      x_ = 0;
     }
-    if( (cube->rec.origin.y + cube->height) < c->rec.origin.y  || (c->rec.origin.y + c->height) < cube->rec.origin.y){
+    if( (cube->rec.origin.y + (cube->height-threshold)) <= c->rec.origin.y  || (c->rec.origin.y + (c->height-threshold)) <= cube->rec.origin.y){
       intersect = false;
-      y_ = 0;
     }
     //if cubes intersect, do something
     if(intersect){
-      if(x_)
+      //x axis:
+      int centerX1 = cube->rec.origin.x;  
+      int centerX2 = c->rec.origin.x;
+      int dis = centerX1 - centerX2;
+      if(dis < 0){
+        e = 0.1;
         cube->vel.x = -cube->vel.x * e;
-      if(y_)
-        cube->vel.y = -cube->vel.y * e;
-    }
-  }
-  
-  cube->rec.origin.x += cube->vel.x;
-  cube->rec.origin.y += cube->vel.y;
-}
+      }
+      else{
+          e = 0.2;
+          cube->vel.x = e;//-cube->vel.x * e;
+      }
 
+      //y axis
+      int centerY1 = cube->rec.origin.y;  
+      int centerY2 = c->rec.origin.y;
+      dis = centerY1 - centerY2;
+      if(dis < 0){
+        e = 0.1;
+        cube->vel.y = -cube->vel.y * e;
+      }
+      else{
+          e = 0.2;
+          cube->vel.y = e;
+      }
+    }
+     cube->rec.origin.x += cube->vel.x;
+     cube->rec.origin.y += cube->vel.y;
+  }
+}
 
 static void timer_callback(void *data) {
   AccelData accel = (AccelData) { .x = 0, .y = 0, .z = 0 };
   accel_service_peek(&accel);
+  
+  done = false;
+  int numActive = myTime.hour * 0.5;
+  numActive = myTime.hour - numActive;
+  int curActive = 0;
  //sending accelerometer info to all the hr cubes
   for (int i = 0; i < NUM_CUBES; i++) {
     Cube *cube = &cubes[i];
     if(cube->curHeight < cube->height) continue;
-    cube_apply_accel(cube, accel);
-    cube_update(cube, i);
+    if(!done){
+      cube_apply_accel(cube, accel);
+      cube_update(cube, i);
+    }
+    curActive++;
+    if(numActive <= curActive)
+       done = true;
   }
-
   //mark layer dirty so it calld calls draw fun. again
   layer_mark_dirty(cube_layer);
   timer = app_timer_register(ACCEL_STEP_MS, timer_callback, NULL);
@@ -330,9 +353,8 @@ static void main_window_load(Window *window) {
 // function called on window unload
 static void main_window_unload(Window *window) {
   // Destroy TextLayer
- // text_layer_destroy(my_time_layer);
+  text_layer_destroy(my_time_layer);
   layer_destroy(secondCube_layer);
-  //layer_destroy(cube_layer);
 }
 
 static void init() {
